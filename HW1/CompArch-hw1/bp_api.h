@@ -1,11 +1,6 @@
 /* 046267 Computer Architecture - Spring 2020 - HW #1 */
 /* API for the predictor simulator */
 
-// Libraries
-#include <vector>
-
-// Typedefs
-using std::vector;
 
 #ifndef BP_API_H_
 #define BP_API_H_
