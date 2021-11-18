@@ -19,6 +19,8 @@ using std::vector;
 #define NO_SHARE 0
 #define SHARE_USING_LSB 1
 #define SHARE_USING_MID 2
+
+#define TARGET_ADDR_SIZE 30
 typedef struct{
 	bool valid;
 	unsigned tag;
@@ -100,9 +102,9 @@ BranchPredictor::BranchPredictor(unsigned btbSize, unsigned historySize, unsigne
 
 
 unsigned BranchPredictor::get_bits(unsigned number, int start, int N_bits){
-	unsigned n = number;
-	n = n >> start;
-	unsigned mask = 1 << N_bits;
+	unsigned n = number; // n = ZZZZZ YYYY 00
+	n = n >> start; //    	ZZZZZ YYYY 00 => ZZZZZ YYYY
+	unsigned mask = 1 << N_bits; // mask = 00001 0000
 	mask -= 1; // 0001000 => 0000111
 	return n & mask;
 }
@@ -111,6 +113,12 @@ uint32_t BranchPredictor::predict(uint32_t pc){
 	int index_N_bits = log2(this->BTB_size);
 	unsigned index = this->get_bits(pc, 2, index_N_bits);
 	Entry entry = this->BTB[index];
+
+	unsigned tag = this->get_bits(pc, 2 + index_N_bits, this->tag_size);
+
+	if (tag != entry.tag){
+		return pc+4;
+	}
 
 	unsigned hist_index;
 	if (this->is_global_history){
@@ -157,7 +165,8 @@ void BranchPredictor::update(uint32_t pc, uint32_t targetPc, bool taken, uint32_
 
 	//Getting tag
 	unsigned tag = this->get_bits(pc, 2 + index_N_bits, this->tag_size);
-	if (tag != entry.tag) {
+	//Replacing existing branch inside BTB or new tag
+	if (!entry.valid || tag != entry.tag) {
 		entry.tag = tag;
 		if (!this->is_global_history)
 			entry.history = 0;
@@ -187,9 +196,9 @@ void BranchPredictor::update(uint32_t pc, uint32_t targetPc, bool taken, uint32_
 
 	entry.target = targetPc;
 
-	if (targetPc != pred_dst)
+	if ((taken && (targetPc != pred_dst)) || (!taken && (pred_dst != pc+4)))
 		this->num_flushes++;
-	
+
 	int direction = taken ? 1 : -1;
 
 	if (this->is_global_machine){
@@ -219,6 +228,8 @@ void BranchPredictor::update(uint32_t pc, uint32_t targetPc, bool taken, uint32_
 		entry.history = entry.history & ((1 << this->hist_size) - 1);
 	}
 
+	this->BTB[index] = entry;
+
 }
 
 int BranchPredictor::get_valid_entries() {
@@ -237,18 +248,18 @@ SIM_stats BranchPredictor::get_stats() {
 	int N_BHR = this->get_valid_entries();
 	if (this->is_global_history){
 		if (this->is_global_machine){
-			stats.size = this->hist_size + pow(2, this->hist_size + 1);
+			stats.size = this->BTB_size * (this->tag_size + 1 + TARGET_ADDR_SIZE) + this->hist_size + pow(2, this->hist_size + 1);
 		}
 		else{
-			stats.size = N_BHR * (this->tag_size + 1 + pow(2, this->hist_size+1)) + this->hist_size;
+			stats.size = this->BTB_size * (this->tag_size + 1 + TARGET_ADDR_SIZE + pow(2, this->hist_size+1)) + this->hist_size;
 		}
 	}
 	else {
 		if (this->is_global_machine){
-			stats.size = N_BHR * (this->tag_size + 1 + this->hist_size) + pow(2, this->hist_size + 1);
+			stats.size = this->BTB_size * (this->tag_size + 1 + TARGET_ADDR_SIZE + this->hist_size) + pow(2, this->hist_size + 1);
 		}
 		else {
-			stats.size = N_BHR * (this->tag_size + 1 + this->hist_size + pow(2, this->hist_size + 1));
+			stats.size = this->BTB_size * (this->tag_size + 1 + TARGET_ADDR_SIZE + this->hist_size + pow(2, this->hist_size + 1));
 		}
 	}
 	return stats;
