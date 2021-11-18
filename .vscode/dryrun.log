@@ -1,0 +1,9 @@
+make all -f "/home/compm/Documents/repo/Comp_Arch_Winter/HW1/CompArch-hw1/makefile" --dry-run --keep-going --print-directory
+make: Entering directory '/home/compm/Documents/repo/Comp_Arch_Winter'
+ 
+make: *** No rule to make target 'bp_main.c', needed by 'bp_main.o'.
+ 
+make: *** No rule to make target 'bp.cpp', needed by 'bp.o'.
+ 
+make: Leaving directory '/home/compm/Documents/repo/Comp_Arch_Winter'
+ 

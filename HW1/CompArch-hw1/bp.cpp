@@ -5,6 +5,7 @@
 #include "bp_api.h"
 #include <vector>
 #include <math.h>
+#include <stdio.h>
 
 // Typedefs
 using std::vector;
@@ -14,7 +15,12 @@ using std::vector;
 #define WNT 1 // 0b01
 #define WT 2  // 0b10
 #define ST 3  // 0b11
+
+#define NO_SHARE 0
+#define SHARE_USING_LSB 1
+#define SHARE_USING_MID 2
 typedef struct{
+	bool valid;
 	unsigned tag;
 	unsigned target;
 	unsigned history;
@@ -37,7 +43,7 @@ private:
 	//Booleans
 	bool is_global_machine;
 	bool is_global_history;
-	bool is_shared;
+	int is_shared;
 
     //Defaults
     unsigned def_fsm;
@@ -53,6 +59,7 @@ public:
 	unsigned get_bits(unsigned number, int start, int end);
 	void update(uint32_t pc, uint32_t targetPc, bool taken, uint32_t pred_dst);
 	SIM_stats get_stats();
+	int get_valid_entries();
 };
 
 BranchPredictor::BranchPredictor(){
@@ -67,6 +74,7 @@ BranchPredictor::BranchPredictor(unsigned btbSize, unsigned historySize, unsigne
 	def_entry.tag = 0;
 	def_entry.target = 0;
 	def_entry.history = 0;
+	def_entry.valid = false;
 
 	int state_size = pow(2, this->hist_size);
 
@@ -112,6 +120,17 @@ uint32_t BranchPredictor::predict(uint32_t pc){
 		hist_index = entry.history;
 	}
 
+	// LShare or GShare Handling
+	if (this->is_shared != NO_SHARE){
+		int start;
+		if (this->is_shared == SHARE_USING_LSB)
+			start = 2;
+		else if (this->is_shared == SHARE_USING_MID)
+			start = 16;
+		unsigned BIP = this->get_bits(pc, start, this->hist_size);
+		hist_index = hist_index ^ BIP;
+	}
+
 	int state;
 	if (this->is_global_machine){
 		state = global_machines[hist_index];
@@ -133,6 +152,9 @@ void BranchPredictor::update(uint32_t pc, uint32_t targetPc, bool taken, uint32_
 	unsigned index = this->get_bits(pc, 2, index_N_bits);
 	Entry entry = this->BTB[index];
 
+	if (!entry.valid)
+		entry.valid = true;
+
 	//Getting tag
 	unsigned tag = this->get_bits(pc, 2 + index_N_bits, this->tag_size);
 	if (tag != entry.tag) {
@@ -145,10 +167,22 @@ void BranchPredictor::update(uint32_t pc, uint32_t targetPc, bool taken, uint32_
 
 	unsigned hist_index;
 	if (this->is_global_history){
+
 		hist_index = this->global_history;
 	}
 	else {
 		hist_index = entry.history;
+	}
+	
+	// LShare or GShare Handling
+	if (this->is_shared != NO_SHARE){
+		int start;
+		if (this->is_shared == SHARE_USING_LSB)
+			start = 2;
+		else if (this->is_shared == SHARE_USING_MID)
+			start = 16;
+		unsigned BIP = this->get_bits(pc, start, this->hist_size);
+		hist_index = hist_index ^ BIP;
 	}
 
 	entry.target = targetPc;
@@ -187,11 +221,36 @@ void BranchPredictor::update(uint32_t pc, uint32_t targetPc, bool taken, uint32_
 
 }
 
+int BranchPredictor::get_valid_entries() {
+	int counter = 0;
+	for (vector<Entry>::iterator it = this->BTB.begin(); it != this->BTB.end(); it++) {
+		if (it->valid)
+			counter++;
+	}
+	return counter;
+}
+
 SIM_stats BranchPredictor::get_stats() {
 	SIM_stats stats;
 	stats.br_num = this->num_branches;
 	stats.flush_num = this->num_flushes;
-	stats.size = sizeof(this); //FIXME: Check if calculate theoretical or sizeof
+	int N_BHR = this->get_valid_entries();
+	if (this->is_global_history){
+		if (this->is_global_machine){
+			stats.size = this->hist_size + pow(2, this->hist_size + 1);
+		}
+		else{
+			stats.size = N_BHR * (this->tag_size + 1 + pow(2, this->hist_size+1)) + this->hist_size;
+		}
+	}
+	else {
+		if (this->is_global_machine){
+			stats.size = N_BHR * (this->tag_size + 1 + this->hist_size) + pow(2, this->hist_size + 1);
+		}
+		else {
+			stats.size = N_BHR * (this->tag_size + 1 + this->hist_size + pow(2, this->hist_size + 1));
+		}
+	}
 	return stats;
 }
 
@@ -216,6 +275,7 @@ int BP_init(unsigned btbSize, unsigned historySize, unsigned tagSize, unsigned f
 bool BP_predict(uint32_t pc, uint32_t *dst){
 
 	*dst = branch_predictor.predict(pc);
+	// printf("%#x\n", *dst);
 	return *dst != (pc+4);
 
 }
