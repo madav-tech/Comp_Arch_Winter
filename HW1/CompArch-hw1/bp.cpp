@@ -78,8 +78,10 @@ BranchPredictor::BranchPredictor(unsigned btbSize, unsigned historySize, unsigne
 	def_entry.history = 0;
 	def_entry.valid = false;
 
+	//Number of state machines (local or global)
 	int state_size = pow(2, this->hist_size);
 
+	//Global state machines
 	if (this->is_global_machine) {
 		def_entry.state_machine = vector<int>();
 		this->global_machines = vector<int>(state_size, this->def_fsm);
@@ -88,6 +90,7 @@ BranchPredictor::BranchPredictor(unsigned btbSize, unsigned historySize, unsigne
 		def_entry.state_machine = vector<int>(state_size, this->def_fsm);
 	}
 
+	//Global History Register
 	if (this->is_global_history) {
 		this->global_history = 0;
 	}
@@ -100,7 +103,7 @@ BranchPredictor::BranchPredictor(unsigned btbSize, unsigned historySize, unsigne
 	
 }
 
-
+//Helper method to extract bits from given number
 unsigned BranchPredictor::get_bits(unsigned number, int start, int N_bits){
 	unsigned n = number; // n = ZZZZZ YYYY 00
 	n = n >> start; //    	ZZZZZ YYYY 00 => ZZZZZ YYYY
@@ -112,7 +115,7 @@ unsigned BranchPredictor::get_bits(unsigned number, int start, int N_bits){
 uint32_t BranchPredictor::predict(uint32_t pc){
 	int index_N_bits = log2(this->BTB_size);
 	unsigned index = this->get_bits(pc, 2, index_N_bits);
-	Entry entry = this->BTB[index];
+	Entry entry = this->BTB[index]; // Accessing correct BTB Entry
 
 	unsigned tag = this->get_bits(pc, 2 + index_N_bits, this->tag_size);
 
@@ -155,18 +158,19 @@ uint32_t BranchPredictor::predict(uint32_t pc){
 }
 
 void BranchPredictor::update(uint32_t pc, uint32_t targetPc, bool taken, uint32_t pred_dst){
-	this->num_branches++;
+	this->num_branches++; // For stats method
 	int index_N_bits = log2(this->BTB_size);
 	unsigned index = this->get_bits(pc, 2, index_N_bits);
 	Entry entry = this->BTB[index];
 
+	//New BTB Entry
 	if (!entry.valid)
 		entry.valid = true;
 
 	//Getting tag
 	unsigned tag = this->get_bits(pc, 2 + index_N_bits, this->tag_size);
 	//Replacing existing branch inside BTB or new tag
-	if (!entry.valid || tag != entry.tag) {
+	if (tag != entry.tag) {
 		entry.tag = tag;
 		if (!this->is_global_history)
 			entry.history = 0;
@@ -193,26 +197,28 @@ void BranchPredictor::update(uint32_t pc, uint32_t targetPc, bool taken, uint32_
 		unsigned BIP = this->get_bits(pc, start, this->hist_size);
 		hist_index = hist_index ^ BIP;
 	}
-
+	//Updating jump target
 	entry.target = targetPc;
-
+	//Wrong prediction => Flush
 	if ((taken && (targetPc != pred_dst)) || (!taken && (pred_dst != pc+4)))
 		this->num_flushes++;
 
+	//Direction of which to change the state machine
 	int direction = taken ? 1 : -1;
 
+	//Upadting State Machines
 	if (this->is_global_machine){
 		this->global_machines[hist_index] += direction;
-		if (this->global_machines[hist_index] == 5 || this->global_machines[hist_index] == -1)
+		if (this->global_machines[hist_index] == ST + 1 || this->global_machines[hist_index] == SNT-1)
 			this->global_machines[hist_index] -= direction;
 	}
 	else {
 		entry.state_machine[hist_index] += direction;
-		if (entry.state_machine[hist_index] == 5 || entry.state_machine[hist_index] == -1)
+		if (entry.state_machine[hist_index] == ST + 1 || entry.state_machine[hist_index] == SNT-1)
 			entry.state_machine[hist_index] -= direction;
 	}
 
-
+	//Updating Hisotry registers
 	if (this->is_global_history) {
 		this->global_history = this->global_history << 1;
 		if (taken)
@@ -232,20 +238,11 @@ void BranchPredictor::update(uint32_t pc, uint32_t targetPc, bool taken, uint32_
 
 }
 
-int BranchPredictor::get_valid_entries() {
-	int counter = 0;
-	for (vector<Entry>::iterator it = this->BTB.begin(); it != this->BTB.end(); it++) {
-		if (it->valid)
-			counter++;
-	}
-	return counter;
-}
 
 SIM_stats BranchPredictor::get_stats() {
 	SIM_stats stats;
 	stats.br_num = this->num_branches;
 	stats.flush_num = this->num_flushes;
-	int N_BHR = this->get_valid_entries();
 	if (this->is_global_history){
 		if (this->is_global_machine){
 			stats.size = this->BTB_size * (this->tag_size + 1 + TARGET_ADDR_SIZE) + this->hist_size + pow(2, this->hist_size + 1);
