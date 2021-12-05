@@ -45,6 +45,7 @@ public:
     bool seek(unsigned long int addr, char op, bool writeback);
     bool add_address(unsigned long int addr, unsigned long int* dirty_tag, bool* removed);
     void remove(unsigned long int addr);
+    void mark_dirty(unsigned long int addr);
     double N_misses, N_hits;
     unsigned access_time;
 };
@@ -67,7 +68,7 @@ bool Cache::seek(unsigned long int addr, char op, bool writeback){
     unsigned addr_set = get_bits(addr, this->offset_bits, this->set_bits);
     unsigned addr_tag = get_bits(addr, this->offset_bits + this->set_bits, this->tag_bits);
 
-    cout << "SET: " << addr_set << ", TAG: " << addr_tag << endl;
+    // cout << "SET: " << addr_set << ", TAG: " << addr_tag << endl;
 
     for (vector<TagEntry>::iterator it = this->cache_table[addr_set].begin();
          it != this->cache_table[addr_set].end(); it++){
@@ -109,7 +110,7 @@ bool Cache::add_address(unsigned long int addr, unsigned long int* removed_addr,
     this->cache_table[addr_set].insert(this->cache_table[addr_set].begin(), new_entry);
     if (this->cache_table[addr_set].size() > this->N_ways){
         *removed = true;
-        TagEntry to_delete = *(this->cache_table[addr_set].end()--);
+        TagEntry to_delete = this->cache_table[addr_set].back();
         this->cache_table[addr_set].pop_back();
         *removed_addr = to_delete.addr;
         if (to_delete.dirty)
@@ -126,6 +127,18 @@ void Cache::remove(unsigned long int addr) {
          it != this->cache_table[addr_set].end(); it++){
         if (it->tag == addr_tag){
             this->cache_table[addr_set].erase(it);
+            return;
+        }
+    }
+}
+
+void Cache::mark_dirty(unsigned long int addr) {
+    unsigned addr_set = get_bits(addr, this->offset_bits, this->set_bits);
+    unsigned addr_tag = get_bits(addr, this->offset_bits + this->set_bits, this->tag_bits);
+    for (vector<TagEntry>::iterator it = this->cache_table[addr_set].begin();
+         it != this->cache_table[addr_set].end(); it++){
+        if (it->tag == addr_tag){
+            it->dirty = true;
             return;
         }
     }
