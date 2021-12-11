@@ -45,7 +45,8 @@ public:
     bool seek(unsigned long int addr, char op, bool writeback);
     bool add_address(unsigned long int addr, unsigned long int* dirty_tag, bool* removed);
     void remove(unsigned long int addr);
-    void mark_dirty(unsigned long int addr);
+    void mark_dirty(unsigned long int addr, bool set_dirty);
+    bool is_dirty(unsigned long int addr);
     double N_misses, N_hits;
     unsigned access_time;
 };
@@ -132,14 +133,27 @@ void Cache::remove(unsigned long int addr) {
     }
 }
 
-void Cache::mark_dirty(unsigned long int addr) {
+void Cache::mark_dirty(unsigned long int addr, bool set_dirty) {
     unsigned addr_set = get_bits(addr, this->offset_bits, this->set_bits);
     unsigned addr_tag = get_bits(addr, this->offset_bits + this->set_bits, this->tag_bits);
     for (vector<TagEntry>::iterator it = this->cache_table[addr_set].begin();
          it != this->cache_table[addr_set].end(); it++){
         if (it->tag == addr_tag){
-            it->dirty = true;
+            it->dirty = set_dirty;
             return;
         }
     }
+}
+
+//Only call if addr is already in the Cache
+bool Cache::is_dirty(unsigned long int addr){
+    unsigned addr_set = get_bits(addr, this->offset_bits, this->set_bits);
+    unsigned addr_tag = get_bits(addr, this->offset_bits + this->set_bits, this->tag_bits);
+    for (vector<TagEntry>::iterator it = this->cache_table[addr_set].begin();
+         it != this->cache_table[addr_set].end(); it++){
+        if (it->tag == addr_tag){
+            return it->dirty;
+        }
+    }
+    return false;
 }
