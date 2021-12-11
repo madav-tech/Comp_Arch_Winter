@@ -69,16 +69,17 @@ bool Cache::seek(unsigned long int addr, char op, bool writeback){
     unsigned addr_set = get_bits(addr, this->offset_bits, this->set_bits);
     unsigned addr_tag = get_bits(addr, this->offset_bits + this->set_bits, this->tag_bits);
 
-    // cout << "SET: " << addr_set << ", TAG: " << addr_tag << endl;
 
     for (vector<TagEntry>::iterator it = this->cache_table[addr_set].begin();
          it != this->cache_table[addr_set].end(); it++){
-        if (it->tag == addr_tag){
+        if (it->tag == addr_tag){ //Found correct tag
             TagEntry new_entry;
             new_entry.tag = it->tag;
             new_entry.dirty = it->dirty;
             new_entry.addr = it->addr;
             
+            //Moving address to start of vector (for LRU purposes)
+
             this->cache_table[addr_set].erase(it);
             
             this->cache_table[addr_set].insert(this->cache_table[addr_set].begin(), new_entry);
@@ -91,7 +92,6 @@ bool Cache::seek(unsigned long int addr, char op, bool writeback){
             return true;
         }
     }
-    // cout << "Misses: " << this->N_misses << "Hits: " << this->N_hits << endl;
     if (!writeback){
         this->N_misses++;
     }
@@ -109,14 +109,12 @@ bool Cache::add_address(unsigned long int addr, unsigned long int* removed_addr,
     new_entry.addr = addr;
 
     this->cache_table[addr_set].insert(this->cache_table[addr_set].begin(), new_entry);
-    if (this->cache_table[addr_set].size() > this->N_ways){
+    if (this->cache_table[addr_set].size() > this->N_ways){ //Set full - Need to remove an entry
         *removed = true;
-        TagEntry to_delete = this->cache_table[addr_set].back();
+        TagEntry to_delete = this->cache_table[addr_set].back(); // Choosing victim for removal
         this->cache_table[addr_set].pop_back();
         *removed_addr = to_delete.addr;
-        if (to_delete.dirty)
-            return true;
-        return false;
+        return to_delete.dirty;
     }
     return false;
 }
@@ -124,10 +122,11 @@ bool Cache::add_address(unsigned long int addr, unsigned long int* removed_addr,
 void Cache::remove(unsigned long int addr) {
     unsigned addr_set = get_bits(addr, this->offset_bits, this->set_bits);
     unsigned addr_tag = get_bits(addr, this->offset_bits + this->set_bits, this->tag_bits);
+
     for (vector<TagEntry>::iterator it = this->cache_table[addr_set].begin();
          it != this->cache_table[addr_set].end(); it++){
-        if (it->tag == addr_tag){
-            this->cache_table[addr_set].erase(it);
+        if (it->tag == addr_tag){ //Found address
+            this->cache_table[addr_set].erase(it); //Removing
             return;
         }
     }
@@ -138,8 +137,8 @@ void Cache::mark_dirty(unsigned long int addr, bool set_dirty) {
     unsigned addr_tag = get_bits(addr, this->offset_bits + this->set_bits, this->tag_bits);
     for (vector<TagEntry>::iterator it = this->cache_table[addr_set].begin();
          it != this->cache_table[addr_set].end(); it++){
-        if (it->tag == addr_tag){
-            it->dirty = set_dirty;
+        if (it->tag == addr_tag){ //Found address
+            it->dirty = set_dirty; //Marking as either dirty or not dirty
             return;
         }
     }
@@ -151,8 +150,8 @@ bool Cache::is_dirty(unsigned long int addr){
     unsigned addr_tag = get_bits(addr, this->offset_bits + this->set_bits, this->tag_bits);
     for (vector<TagEntry>::iterator it = this->cache_table[addr_set].begin();
          it != this->cache_table[addr_set].end(); it++){
-        if (it->tag == addr_tag){
-            return it->dirty;
+        if (it->tag == addr_tag){ //Found address
+            return it->dirty; 
         }
     }
     return false;

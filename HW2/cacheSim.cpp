@@ -15,7 +15,7 @@ using std::ifstream;
 using std::stringstream;
 
 
-double handle_line(Cache& L1, Cache& L2, char op, unsigned long int addr, unsigned MemCyc, bool WrAlloc){ //CHECK: unsigned -> bool conversion
+double handle_line(Cache& L1, Cache& L2, char op, unsigned long int addr, unsigned MemCyc, bool WrAlloc){
 	
 	unsigned long int removed_addr = 0;
 	bool removed = false;
@@ -25,15 +25,12 @@ double handle_line(Cache& L1, Cache& L2, char op, unsigned long int addr, unsign
 		//L1 Hit
 		if (L1_hit)
 		{
-			// cout << "L1 HIT" << endl;
 			return L1.access_time;
 		}
-		// cout << "L1 MISS" << endl;
 		//L1 Miss
 		bool L2_hit = L2.seek(addr, op, false);
 		//L2 Hit
 		if (L2_hit){
-			// cout << "L2 HIT" << endl;
 
 			bool L2_was_dirty = L2.is_dirty(addr);
 			bool L1_dirty = L1.add_address(addr, &removed_addr, &removed);
@@ -44,11 +41,10 @@ double handle_line(Cache& L1, Cache& L2, char op, unsigned long int addr, unsign
 			}
 
 			if (L1_dirty){
-				L2.seek(removed_addr, 'w', true); //CHECK: Does cycle time not change when accessing L2 AGAIN?
+				L2.seek(removed_addr, 'w', true);
 			}
 			return L1.access_time + L2.access_time;
 		}
-		// cout << "L2 MISS" << endl;
 		//L2 Miss
 		bool L2_dirty = L2.add_address(addr, &removed_addr, &removed); // L2_dirty unused because this program doesn't handle the memory side. CHECK: DO WE NEED TO ADD T_mem HERE?
 		if (removed){
@@ -56,8 +52,7 @@ double handle_line(Cache& L1, Cache& L2, char op, unsigned long int addr, unsign
 		}
 		bool L1_dirty = L1.add_address(addr, &removed_addr, &removed);
 		if (L1_dirty){
-			// cout << "DIRTY" << endl;
-			L2.seek(removed_addr, 'w', true); //CHECK: Does cycle time not change when accessing L2 AGAIN?
+			L2.seek(removed_addr, 'w', true);
 		}
 		return L1.access_time + L2.access_time + MemCyc;
 	}
@@ -66,25 +61,23 @@ double handle_line(Cache& L1, Cache& L2, char op, unsigned long int addr, unsign
 		//L1 Hit
 		if (L1_hit)
 		{
-			// cout << "L1 HIT" << endl;
 			return L1.access_time;
 		}
 
-		// cout << "L1 MISS" << endl;
 		//L1 Miss
 		bool L2_hit = L2.seek(addr, op, false);
 		//L2 Hit
 		if (L2_hit){
-			// cout << "L2 HIT" << endl;
 			if (WrAlloc){
 				bool L1_dirty = L1.add_address(addr, &removed_addr, &removed);
+				L1.mark_dirty(addr, true);
+				L2.mark_dirty(addr, false);
 				if (L1_dirty){
-					L2.seek(removed_addr, 'w', true); //CHECK: Does cycle time not change when accessing L2 AGAIN?
+					L2.seek(removed_addr, 'w', true);
 				}
 			}
 			return L1.access_time + L2.access_time;
 		}
-		// cout << "L2 MISS" << endl;
 		//L2 Miss
 		if (WrAlloc){
 			bool L2_dirty = L2.add_address(addr, &removed_addr, &removed); // L2_dirty unused because this program doesn't handle the memory side. CHECK: DO WE NEED TO ADD T_mem HERE?
@@ -94,7 +87,7 @@ double handle_line(Cache& L1, Cache& L2, char op, unsigned long int addr, unsign
 			bool L1_dirty = L1.add_address(addr, &removed_addr, &removed);
 			L1.mark_dirty(addr, true);
 			if (L1_dirty){
-				L2.seek(removed_addr, 'w', true); //CHECK: Does cycle time not change when accessing L2 AGAIN?
+				L2.seek(removed_addr, 'w', true);
 			}
 		}
 		return L1.access_time + L2.access_time + MemCyc;
@@ -189,7 +182,6 @@ int main(int argc, char **argv) {
 		
 		counter++;
 		double current_time = handle_line(L1, L2, operation, addr, MemCyc, WrAlloc);
-		// cout << endl << endl;
 		sum_cycles += current_time;
 	}
 
