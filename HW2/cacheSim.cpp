@@ -32,14 +32,7 @@ double handle_line(Cache& L1, Cache& L2, char op, unsigned long int addr, unsign
 		//L2 Hit
 		if (L2_hit){
 
-			bool L2_was_dirty = L2.is_dirty(addr);
 			bool L1_dirty = L1.add_address(addr, &removed_addr, &removed);
-
-			if (L2_was_dirty){
-				L1.mark_dirty(addr, true);
-				L2.mark_dirty(addr, false);
-			}
-
 			if (L1_dirty){
 				L2.seek(removed_addr, 'w', true);
 			}
