@@ -5,10 +5,10 @@ all: dflow_calc
 
 # Environment for C
 CC = gcc
-CFLAGS = -std=c99 -Wall
+CFLAGS = -std=c99 -Wall -g
 # Environment for C++
 CXX = g++
-CXXFLAGS = -std=c++11 -Wall
+CXXFLAGS = -std=c++11 -Wall -g
 
 ifeq ($(DEBUG),1)
   CFLAGS += -g -O0
