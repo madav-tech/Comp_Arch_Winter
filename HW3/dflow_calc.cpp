@@ -6,8 +6,9 @@
 #include "dflow_calc.h"
 #include "vector"
 #include <math.h>
+#include <stdio.h>
 
-#define EXIT_START_SIZE 10
+#define EXIT_START_SIZE 100
 #define ENTRY_IDX -1
 #define EXIT_IDX -2
 #define NO_REG -10
@@ -229,6 +230,7 @@ ProgCtx analyzeProg(const unsigned int opsLatency[], const InstInfo progTrace[],
         new_inst->write_reg = progTrace[i].dstIdx;
 
         add_inst(new_tree, new_inst);
+        // printf("%d\n", new_inst->inst_idx);
     }
 
     return new_tree;
@@ -334,8 +336,13 @@ int getInstDeps(ProgCtx ctx, unsigned int theInst, int *src1DepInst, int *src2De
         }
         // Same Dependencies
         else {
+            //Two read registers are the same
+            if (inst->read_reg1 == inst->read_reg2){
+                *src1DepInst = inst->dep1->inst_idx;
+                *src2DepInst = inst->dep2->inst_idx;
+            }
             //dep1 is the true dependency
-            if (inst->dep1->write_reg == inst->read_reg1) {
+            else if (inst->dep1->write_reg == inst->read_reg1) {
                 *src1DepInst = inst->dep1->inst_idx;
                 *src2DepInst = ENTRY_IDX;
             }
