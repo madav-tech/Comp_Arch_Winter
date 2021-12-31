@@ -2,7 +2,7 @@
 
 #test automation script
 INPUT_DIR="rand_tests"
-OUT_DIR="rand_results"
+OUT_DIR="Ofry_500_tests"
 MY_OUT_DIR_NAME="my_out"
 OUT_BIN="dflow_calc"
 
@@ -45,7 +45,7 @@ for i in `seq 1 $number_of_example_files` ; do
 	    ./$OUT_BIN $testFile1 $testFile2 $testArgs > $MY_OUT_DIR_NAME/'opcode'$j'-example'$i'.myout'
 	    # Use next line instead of previous one to create result output
  	    #./$OUT_BIN $testFile1 $testFile2 $testArgs > $OUT_DIR/'opcode'$j'-example'$i'.out'
-    	if [ `diff $OUT_DIR/'opcode'$j'-example'$i'.out' $MY_OUT_DIR_NAME/'opcode'$j'-example'$i'.myout' | wc -w` -eq 0 ] ; then 
+    	if [ `diff $OUT_DIR/'opcode'$j'-example'$i'.myout' $MY_OUT_DIR_NAME/'opcode'$j'-example'$i'.myout' | wc -w` -eq 0 ] ; then 
     		echo -e "     Passed!"
     
    	else 
