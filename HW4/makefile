@@ -2,11 +2,11 @@ all: sim_main
 
 # Env for C
 CC = gcc
-CFLAGS = -std=c99 -Wall -O0
+CFLAGS = -std=c99 -Wall -O0 -g
 
 # Env for C++
 CXX = g++
-CXXFLAGS = -std=c++11 -Wall -O0
+CXXFLAGS = -std=c++11 -Wall -O0 -g
 
 ifeq ($(DEBUG),1)
   CFLAGS += -g
