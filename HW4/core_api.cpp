@@ -205,7 +205,7 @@ void Thread_Handler::run_program_blocked(){
 			this->current_thread->execute_inst(this->current_cycle);
 			this->N_instructions++;
 		}
-		if ((this->switch_penalty < this->latency(this->current_thread->current_inst.opcode) - (this->current_cycle - this->current_thread->start_cycle)))
+		if ((this->switch_penalty < this->latency(this->current_thread->current_inst.opcode) - (this->current_cycle - this->current_thread->start_cycle))) //FIXME: Latz thinks this shouldn't work (Nadav agrees)
 			is_idle = this->switch_thread();
 	}
 }
