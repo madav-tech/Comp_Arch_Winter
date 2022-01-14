@@ -20,7 +20,7 @@ class Thread {
 	int start_cycle;
 
 	Thread(int id);
-	void execute_inst(int start_cycle);
+	bool execute_inst(int start_cycle);
 	void execute();
 
 };
@@ -32,12 +32,14 @@ class Thread {
 		}
 	}
 
-	void Thread::execute_inst(int start_cycle) {
+	bool Thread::execute_inst(int start_cycle) {
 		this->start_cycle = start_cycle + 1;
 		SIM_MemInstRead(this->inst_address, &current_inst, this->thread_id);
 		this->execute();
 
-		this->inst_address += 4;
+		this->inst_address++;
+		bool event = (this->current_inst.opcode == CMD_LOAD) || (this->current_inst.opcode == CMD_STORE) || (this->current_inst.opcode == CMD_HALT);
+		return event;
 	}
 
 	void Thread::execute() {
@@ -70,9 +72,11 @@ class Thread {
 		}
 
 		else if (this->current_inst.opcode == CMD_LOAD){
-			int offset = this->reg_file.reg[src2];
+			int offset = 0;
 			if (this->current_inst.isSrc2Imm)
 				offset = src2;
+			else
+				offset = this->reg_file.reg[src2];
 			
 			unsigned int address = this->reg_file.reg[src1] + offset;
 			SIM_MemDataRead(address, &(this->reg_file.reg[dst]));
@@ -80,9 +84,11 @@ class Thread {
 		}
 		
 		else if (this->current_inst.opcode == CMD_STORE){
-			int offset = this->reg_file.reg[src2];
+			int offset = 0;
 			if (this->current_inst.isSrc2Imm)
 				offset = src2;
+			else
+				offset = this->reg_file.reg[src2];
 			
 			unsigned int address = this->reg_file.reg[dst] + offset;
 			SIM_MemDataWrite(address, src1);
@@ -156,6 +162,11 @@ int Thread_Handler::latency(int opcode){
 }
 
 bool Thread_Handler::switch_thread(){
+	if (this->is_blocked_MT && !this->current_thread->is_halted){
+		if (this->current_cycle - this->current_thread->start_cycle >= this->latency(this->current_thread->current_inst.opcode)){
+			return false;
+		}
+	}
 	for (int i=1; i<=this->N_threads; i++){
 		Thread* th = &(this->threads[(this->current_thread_id + i) % this->N_threads]);
 		if (th->is_halted)
@@ -188,26 +199,33 @@ void Thread_Handler::run_program(){
 void Thread_Handler::run_program_finegrained(){
 	bool is_idle = false;
 	while (!this->all_halted()) {
-		this->current_cycle++;
 		if (!is_idle) {
 			this->current_thread->execute_inst(this->current_cycle);
 			this->N_instructions++;
 		}
+		this->current_cycle++;
 		is_idle = this->switch_thread();
 	}
 }
 
 void Thread_Handler::run_program_blocked(){
 	bool is_idle = false;
+	bool event = false;
+	int prev_id = 0;
 	while (!this->all_halted()) {
-		this->current_cycle++;
 		if (!is_idle) {
-			this->current_thread->execute_inst(this->current_cycle);
+			event = this->current_thread->execute_inst(this->current_cycle);
 			this->N_instructions++;
 		}
-		if ((this->switch_penalty < this->latency(this->current_thread->current_inst.opcode) - (this->current_cycle - this->current_thread->start_cycle))) //FIXME: Latz thinks this shouldn't work (Nadav agrees)
+		this->current_cycle++;
+		if (event || is_idle){
+			prev_id = this->current_thread_id;
 			is_idle = this->switch_thread();
+			if (!is_idle && (prev_id != this->current_thread_id))
+				this->current_cycle += this->switch_penalty;
+		}
 	}
+	// this->current_cycle++;
 }
 
 /*
@@ -253,23 +271,27 @@ void CORE_FinegrainedMT() {
 }
 
 double CORE_BlockedMT_CPI(){
-	return blocked_MT.current_cycle / blocked_MT.N_instructions;
+	return double(blocked_MT.current_cycle) / blocked_MT.N_instructions;
 }
 
 double CORE_FinegrainedMT_CPI(){
-	return finegrained_MT.current_cycle / finegrained_MT.N_instructions;
+	return double(finegrained_MT.current_cycle) / finegrained_MT.N_instructions;
 }
 
 void CORE_BlockedMT_CTX(tcontext* context, int threadid) {
-	tcontext* reg_file = &(blocked_MT.threads[threadid].reg_file);
-	for (int i=0; i<REGS_COUNT; i++){
-		(*context).reg[i] = reg_file->reg[i];
+	for (int i=0; i<blocked_MT.N_threads; i++){
+		tcontext reg_file = blocked_MT.threads[threadid].reg_file;
+		for (int j=0; j<REGS_COUNT; j++){
+			context[i].reg[j] = reg_file.reg[j];
+		}
 	}
 }
 
 void CORE_FinegrainedMT_CTX(tcontext* context, int threadid) {
-	tcontext* reg_file = &(finegrained_MT.threads[threadid].reg_file);
-	for (int i=0; i<REGS_COUNT; i++){
-		(*context).reg[i] = reg_file->reg[i];
+	for (int i=0; i<finegrained_MT.N_threads; i++){
+		tcontext reg_file = finegrained_MT.threads[threadid].reg_file;
+		for (int j=0; j<REGS_COUNT; j++){
+			context[i].reg[j] = reg_file.reg[j];
+		}
 	}
 }
