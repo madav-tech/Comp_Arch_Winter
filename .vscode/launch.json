@@ -11,7 +11,7 @@
             "request": "launch",
             // "program": "${fileDirname}/${fileBasenameNoExtension}",
             "program": "${fileDirname}/sim_main",
-            "args": ["./tests/example1.img"],
+            "args": ["./facebook_tests/tests/test1400.in"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
